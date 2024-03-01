@@ -1,6 +1,6 @@
 {
-  "name": "playwright-testrail-reporter",
-  "version": "1.2.0",
+  "name": "pw-simple-testrail-reporter",
+  "version": "1.0.2",
   "description": "Report Playwright test results to TestRail",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -17,12 +17,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/niche-tester/playwright-testrail-reporter.git"
+    "url": "git+https://github.com/ikoral/playwright-testrail-reporter.git"
   },
-  "bugs": {
-    "url": "https://github.com/niche-tester/playwright-testrail-reporter.git"
-  },
-  "homepage": "https://github.com/niche-tester/playwright-testrail-reporter#readme",
   "keywords": [
     "playwright",
     "testrail",
@@ -30,7 +26,7 @@
     "reporter-testrail",
     "playwright-testrail"
   ],
-  "author": "Denisha Surjoodeen",
+  "author": "Ilhan Koral",
   "license": "MIT",
   "dependencies": {
     "@dlenroc/testrail": "^1.9.1",
