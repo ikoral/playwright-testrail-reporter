@@ -1,6 +1,6 @@
 # pw-simple-testrail-reporter
 
-pw-simple-testrail-reporter is a custom reporter for Playwright Test to seamlessly integrate with TestRail. The reporter adds test results to given TEST Run by matching test case IDs.
+pw-simple-testrail-reporter is a custom reporter for Playwright Test to seamlessly integrate with TestRail. The reporter adds test results to given TEST Run by matching test case IDs. So you should provide test run id.
 
 ## Installation
 
