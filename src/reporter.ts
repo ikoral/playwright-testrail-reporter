@@ -36,8 +36,7 @@ const testResults: AddResultsForCases[] = []
 export class TestRailReporter implements Reporter {
     async onBegin?() {
         if (!process.env.TESTRAIL_RUN_ID) {
-            logger("No Existing 'TESTRAIL_RUN_ID' provided by user...")
-            logger("Skipping reporting...")
+            logger("No 'TESTRAIL_RUN_ID' found, skipping reporting......")
         } else {
             logger(
                 "Existing Test Run with ID " +
@@ -74,7 +73,7 @@ export class TestRailReporter implements Reporter {
                     console.log(error)
                 }
             } else {
-                logger("Test case could not be found WHY?")
+                logger("Test case could not be extracted from test title!")
             }
         }
     }
@@ -111,70 +110,6 @@ export function getTestCaseName(testname: string) {
     return testCaseMatches[0]
 }
 
-// /**
-//  * Create TestRail Test Run ID
-//  * @param projectId
-//  * @returns
-//  */
-// async function addTestRailRun(projectId: number) {
-//     return await api
-//         .addRun(projectId, {
-//             include_all: true,
-//             name: runName,
-//             suite_id: suiteId,
-//         })
-//         .then(
-//             (res) => {
-//                 logger(
-//                     'New TestRail run has been created: ' +
-//                         process.env.TESTRAIL_HOST +
-//                         '/index.php?/runs/view/' +
-//                         res.id,
-//                 );
-//                 process.env.TESTRAIL_RUN_ID = res.id.toString();
-//             },
-//             (reason) => {
-//                 logger('Failed to create new TestRail run: ' + reason);
-//             },
-//         );
-// }
-
-// /**
-//  * Add Test Result for TestSuite by Test Case ID/s
-//  * @param api
-//  * @param runId
-//  * @param caseId
-//  * @param status
-//  */
-// async function addResultForSuite(
-//     api: TestRail,
-//     runId: number,
-//     caseId: number,
-//     status: number,
-//     comment: string,
-// ) {
-//     await api
-//         .addResultForCase(runId, caseId, {
-//             status_id: status,
-//             comment: comment,
-//         })
-//         .then(
-//             (res) => {
-//                 logger(
-//                     'Updated status for caseId ' +
-//                         caseId +
-//                         ' for runId ' +
-//                         runId,
-//                 );
-//             },
-//             (reason) => {
-//                 logger(
-//                     'Failed to call Update Api due to ' +
-//                         JSON.stringify(reason),
-//                 );
-//             },
-//         );
-// }
 /**
  * Set Test comment for TestCase Failed | Passed
  * @param result
@@ -186,14 +121,10 @@ function setTestComment(result: TestResult) {
         result.status == "timedOut" ||
         result.status == "interrupted"
     ) {
-        return (
-            "Test Status is " +
-            result.status +
-            " " +
-            JSON.stringify(result.error)
-        )
+        const comment = { testStatus: result.status, testError: result.error }
+        return JSON.stringify(comment)
     } else {
-        return "Test Passed within " + result.duration + " ms"
+        return `Test Passed within ${result.duration} ms`
     }
 }
 

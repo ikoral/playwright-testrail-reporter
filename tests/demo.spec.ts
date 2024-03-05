@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe("Demo Test", () => {
-    test("C37 Logged in with standard user - passed", async ({ page }) => {
+    test("@C37 Logged in with standard user - failed", async ({ page }) => {
         await page.locator('[data-test="username"]').click()
         await page.locator('[data-test="username"]').fill("standard_user")
         await page.locator('[data-test="password"]').click()
@@ -13,12 +13,13 @@ test.describe("Demo Test", () => {
         await page.locator('[data-test="login-button"]').click()
         expect(
             page.getByText(
-                "ProductsName (A to Z)Name (A to Z)Name (Z to A)Price (low to high)Price (high to",
+                // "ProductsName (A to Z)Name (A to Z)Name (Z to A)Price (low to high)Price (high to",
+                "blabla",
             ),
-        )
+        ).toBeVisible()
     })
 
-    test("Logged in with standard user - passed C84875", async ({ page }) => {
+    test("Logged in with standard user - passed @C84875", async ({ page }) => {
         await page.locator('[data-test="username"]').click()
         await page.locator('[data-test="username"]').fill("standard_user")
         await page.locator('[data-test="password"]').click()
