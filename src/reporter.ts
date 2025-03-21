@@ -118,10 +118,36 @@ export class TestRailReporter implements Reporter {
                 logger(
                     `Adding ${testCasesToAdd.length} test cases to run ${runId}`,
                 )
-                await api.updateRun(runId, {
+
+                // First get the current run to see its configuration
+                const currentRun = await api.getRun(runId)
+
+                // Prepare the update payload
+                const updatePayload: any = {
                     case_ids: testCasesToAdd,
-                    include_all: false,
-                })
+                    include_all: currentRun.include_all,
+                }
+
+                // If the run doesn't include all test cases, we need to add our new cases
+                // to the existing ones to avoid replacing them
+                if (!currentRun.include_all) {
+                    // Get existing case IDs if they're not already included in all cases
+                    const existingCaseIds = Array.from(
+                        existingTestCaseIds,
+                    ).filter((id) => !testCasesToAdd.includes(id))
+
+                    // Combine existing and new case IDs
+                    updatePayload.case_ids = [
+                        ...existingCaseIds,
+                        ...testCasesToAdd,
+                    ]
+                    logger(
+                        `Preserving ${existingCaseIds.length} existing test cases in the run`,
+                    )
+                }
+
+                // Update the run with the combined test cases
+                await api.updateRun(runId, updatePayload)
                 logger(`Successfully added test cases to run ${runId}`)
             } catch (error) {
                 logger(`Error adding test cases to run ${runId}: ${error}`)
