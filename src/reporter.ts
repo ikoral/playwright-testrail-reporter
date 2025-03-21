@@ -21,10 +21,10 @@ const StatusMap = new Map<string, number>([
     ["timedout", 5],
     ["interrupted", 5],
 ])
+
 /**
  * Initialise TestRail API credential auth
  */
-
 const api = new TestRail({
     host: process.env.TESTRAIL_HOST as string,
     password: process.env.TESTRAIL_PASSWORD as string,
@@ -32,66 +32,146 @@ const api = new TestRail({
 })
 
 const testResults: AddResultsForCases[] = []
+// Track test case IDs that need to be added to the run
+const testCasesToAdd: number[] = []
+// Track test case IDs already in the run
+const existingTestCaseIds: Set<number> = new Set()
 
 export class TestRailReporter implements Reporter {
     async onBegin?() {
         if (!process.env.TESTRAIL_RUN_ID) {
             logger("No 'TESTRAIL_RUN_ID' found, skipping reporting......")
-        } else {
+            return
+        }
+
+        logger(
+            "Existing Test Run with ID " +
+                process.env.TESTRAIL_RUN_ID +
+                " will be used",
+        )
+
+        // Fetch existing test cases in the run
+        const runId = parseInt(process.env.TESTRAIL_RUN_ID as string)
+        try {
+            const tests = await api.getTests(runId)
+            tests.forEach((test) => {
+                existingTestCaseIds.add(test.case_id)
+            })
             logger(
-                "Existing Test Run with ID " +
-                    process.env.TESTRAIL_RUN_ID +
-                    " will be used",
+                `Found ${existingTestCaseIds.size} test cases in run ${runId}`,
             )
+        } catch (error) {
+            logger(`Error fetching tests for run ${runId}: ${error}`)
         }
     }
 
     onTestEnd(test: TestCase, result: TestResult) {
-        if (process.env.TESTRAIL_RUN_ID) {
-            logger(
-                `Test Case Completed : ${test.title} Status : ${result.status}`,
-            )
+        if (!process.env.TESTRAIL_RUN_ID) {
+            return
+        }
 
-            //Return no test case match with TestRail Case ID Regex
-            const testCaseMatches = getTestCaseName(test.title)
-            if (testCaseMatches != null) {
-                try {
-                    testCaseMatches.forEach((testCaseMatch) => {
-                        const testId = parseInt(testCaseMatch.substring(1), 10)
-                        //  Update test status if test case is not skipped
-                        if (result.status != "skipped") {
-                            const testComment = setTestComment(result)
-                            const payload = {
-                                case_id: testId,
-                                status_id: StatusMap.get(result.status),
-                                comment: testComment,
-                            }
-                            testResults.push(payload)
+        logger(`Test Case Completed : ${test.title} Status : ${result.status}`)
+
+        // Return no test case match with TestRail Case ID Regex
+        const testCaseMatches = getTestCaseName(test.title)
+        if (testCaseMatches != null) {
+            try {
+                testCaseMatches.forEach((testCaseMatch) => {
+                    const testId = parseInt(testCaseMatch.substring(1), 10)
+
+                    // Check if test case is in the run
+                    if (!existingTestCaseIds.has(testId)) {
+                        testCasesToAdd.push(testId)
+                        existingTestCaseIds.add(testId) // Add to set to avoid duplicates
+                        logger(`Test case C${testId} not in run, will be added`)
+                    }
+
+                    // Update test status if test case is not skipped
+                    if (result.status != "skipped") {
+                        const testComment = setTestComment(result)
+                        const payload = {
+                            case_id: testId,
+                            status_id: StatusMap.get(result.status),
+                            comment: testComment,
                         }
-                    })
-                } catch (error) {
-                    console.log(error)
-                }
-            } else {
-                logger("Test case could not be extracted from test title!")
+                        testResults.push(payload)
+                    }
+                })
+            } catch (error) {
+                console.log(error)
             }
+        } else {
+            logger("Test case could not be extracted from test title!")
         }
     }
 
     async onEnd(): Promise<void> {
-        if (process.env.TESTRAIL_RUN_ID) {
-            const runId = parseInt(process.env.TESTRAIL_RUN_ID as string)
+        if (!process.env.TESTRAIL_RUN_ID) {
+            return
+        }
+
+        const runId = parseInt(process.env.TESTRAIL_RUN_ID as string)
+
+        // Add missing test cases to the run if any
+        if (testCasesToAdd.length > 0) {
+            try {
+                logger(
+                    `Adding ${testCasesToAdd.length} test cases to run ${runId}`,
+                )
+
+                // First get the current run to see its configuration
+                const currentRun = await api.getRun(runId)
+
+                // Prepare the update payload
+                const updatePayload: any = {
+                    case_ids: testCasesToAdd,
+                    include_all: currentRun.include_all,
+                }
+
+                // If the run doesn't include all test cases, we need to add our new cases
+                // to the existing ones to avoid replacing them
+                if (!currentRun.include_all) {
+                    // Get existing case IDs if they're not already included in all cases
+                    const existingCaseIds = Array.from(
+                        existingTestCaseIds,
+                    ).filter((id) => !testCasesToAdd.includes(id))
+
+                    // Combine existing and new case IDs
+                    updatePayload.case_ids = [
+                        ...existingCaseIds,
+                        ...testCasesToAdd,
+                    ]
+                    logger(
+                        `Preserving ${existingCaseIds.length} existing test cases in the run`,
+                    )
+                }
+
+                // Update the run with the combined test cases
+                await api.updateRun(runId, updatePayload)
+                logger(`Successfully added test cases to run ${runId}`)
+            } catch (error) {
+                logger(`Error adding test cases to run ${runId}: ${error}`)
+                // If we can't add test cases, we should still try to update results for existing ones
+            }
+        }
+
+        // Update test results
+        if (testResults.length > 0) {
             logger(
                 "Updating test status for the following TestRail Run ID: " +
                     runId,
             )
             await updateResultCases(runId, testResults)
+        } else {
+            logger("No test results to update")
         }
     }
+
     onError(error: TestError): void {
         logger(error.message)
     }
 }
+
 /**
  * Get list of matching Test IDs
  */
@@ -130,7 +210,6 @@ function setTestComment(result: TestResult) {
 
 /**
  * Update TestResult for Multiple Cases
- * @param api
  * @param runId
  * @param payload
  */
